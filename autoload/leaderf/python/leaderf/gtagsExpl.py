@@ -794,7 +794,15 @@ class GtagsExplManager(Manager):
             return
 
         line = args[0]
-        file, line_num = line.split('\t', 2)[:2]
+        if self._getExplorer().getResultFormat() is None:
+            file, line_num = line.split('\t', 2)[:2]
+        elif self._getExplorer().getResultFormat() == "ctags":
+            file, line_num = line.split('\t', 2)[1:]
+        elif self._getExplorer().getResultFormat() == "ctags-x":
+            line_num, file = line.split(None, 3)[1:3]
+        else: # ctags-mod
+            file, line_num = line.split('\t', 2)[:2]
+
         if not os.path.isabs(file):
             file = os.path.join(self._getInstance().getCwd(), lfDecode(file))
             file = os.path.normpath(lfEncode(file))
@@ -824,10 +832,13 @@ class GtagsExplManager(Manager):
                   1, return the name only
                   2, return the directory name
         """
-        if self._match_path:
-            return line
+        if self._getExplorer().getResultFormat() in [None, "ctags-mod"]:
+            if self._match_path:
+                return line
 
-        return line[line.find('\t', line.find('\t')) + 1:]
+            return line[line.find('\t', line.find('\t')) + 1:]
+        else:
+            return line
 
     def _getDigestStartPos(self, line, mode):
         """
@@ -837,10 +848,13 @@ class GtagsExplManager(Manager):
                   1, return the start postion of name only
                   2, return the start postion of directory name
         """
-        if self._match_path:
-            return 0
+        if self._getExplorer().getResultFormat() in [None, "ctags-mod"]:
+            if self._match_path:
+                return 0
 
-        return lfBytesLen(line[:line.find('\t', line.find('\t'))]) + 1
+            return lfBytesLen(line[:line.find('\t', line.find('\t'))]) + 1
+        else:
+            return 0
 
     def _createHelp(self):
         help = []
@@ -858,13 +872,26 @@ class GtagsExplManager(Manager):
 
     def _afterEnter(self):
         super(GtagsExplManager, self)._afterEnter()
-        if self._getExplorer().getResultFormat() == "ctags":
+        if self._getExplorer().getResultFormat() is None:
+            id = int(lfEval('''matchadd('Lf_hl_gtagsFileName', '^.\{-}\ze\t')'''))
+            self._match_ids.append(id)
+            id = int(lfEval('''matchadd('Lf_hl_gtagsLineNumber', '\t\zs\d\+\ze\t')'''))
+            self._match_ids.append(id)
+        elif self._getExplorer().getResultFormat() == "ctags":
+            id = int(lfEval('''matchadd('Lf_hl_gtagsFileName', '\t\zs.\{-}\ze\t')'''))
+            self._match_ids.append(id)
+            id = int(lfEval('''matchadd('Lf_hl_gtagsLineNumber', '\t\zs\d\+$')'''))
+            self._match_ids.append(id)
         elif self._getExplorer().getResultFormat() == "ctags-x":
-        elif self._getExplorer().getResultFormat() == "ctags-mod":
-        id = int(lfEval('''matchadd('Lf_hl_gtagsFileName', '^.\{-}\ze\t')'''))
-        self._match_ids.append(id)
-        id = int(lfEval('''matchadd('Lf_hl_gtagsLineNumber', '\t\zs\d\+\ze\t')'''))
-        self._match_ids.append(id)
+            id = int(lfEval('''matchadd('Lf_hl_gtagsFileName', '^\w\+\s\+\d\+\s\+\zs\S\+')'''))
+            self._match_ids.append(id)
+            id = int(lfEval('''matchadd('Lf_hl_gtagsLineNumber', '^\w\+\s\+\zs\d\+')'''))
+            self._match_ids.append(id)
+        else: # ctags-mod
+            id = int(lfEval('''matchadd('Lf_hl_gtagsFileName', '^.\{-}\ze\t')'''))
+            self._match_ids.append(id)
+            id = int(lfEval('''matchadd('Lf_hl_gtagsLineNumber', '\t\zs\d\+\ze\t')'''))
+            self._match_ids.append(id)
         try:
             for i in self._getExplorer().getPatternRegex():
                 id = int(lfEval("matchadd('Lf_hl_gtagsHighlight', '%s', 9)" % escQuote(i)))
