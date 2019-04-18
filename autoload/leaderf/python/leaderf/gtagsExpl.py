@@ -947,6 +947,11 @@ class GtagsExplManager(Manager):
         del vim.current.buffer[vim.current.window.cursor[0] - 1]
         lfCmd("setlocal nomodifiable")
 
+    def getArguments(self):
+        if self._getExplorer().getResultFormat() is not None and \
+                "--append" in self._arguments:
+            del self._arguments["--append"]
+        return self._arguments
 
 #*****************************************************
 # gtagsExplManager is a singleton
