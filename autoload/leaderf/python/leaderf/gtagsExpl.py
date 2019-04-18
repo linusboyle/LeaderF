@@ -33,6 +33,7 @@ class GtagsExplorer(Explorer):
                                      'gtags')
         self._project_root = ""
         self._gtagslibpath = []
+        self._result_format = None
         self._evalVimVar()
 
         self._task_queue = Queue.Queue()
@@ -95,6 +96,7 @@ class GtagsExplorer(Explorer):
         else:
             path_style = ""
 
+        self._result_format = None
         if "-d" in kwargs.get("arguments", {}):
             pattern = kwargs.get("arguments", {})["-d"][0]
             pattern_option = "-d -e %s " % pattern
@@ -111,10 +113,12 @@ class GtagsExplorer(Explorer):
             pattern = lfEval('expand("<cword>")')
             pattern_option = '--from-here "%d:%s" %s ' % (vim.current.window.cursor[0], vim.current.buffer.name, pattern)
         else:
-            if "--all" not in kwargs.get("arguments", {}):
+            if "--current-buffer" in kwargs.get("arguments", {}):
                 pattern_option = '-f "%s" -q' % vim.current.buffer.name
-            else:
+            elif "--all-buffers" in kwargs.get("arguments", {}):
                 pattern_option = '-f "%s" -q' % '" "'.join(b.name for b in vim.buffers)
+            else: # '--all' or empty means the whole project
+                pattern_option = None
 
             root, dbpath, exists = self._root_dbpath(filename)
             if not filename.startswith(root):
@@ -128,13 +132,23 @@ class GtagsExplorer(Explorer):
                                 dbpath = tmp_dbpath
                                 break
 
+            if "--result" in kwargs.get("arguments", {}):
+                self._result_format = kwargs.get("arguments", {})["--result"][0]
+            else:
+                self._result_format = "ctags"
+
             env = os.environ
             env["GTAGSROOT"] = root
             env["GTAGSDBPATH"] = dbpath
 
-            cmd = 'global {}--gtagslabel={} {} {}--color=never --result=ctags-mod'.format(
-                        '--gtagsconf "%s" ' % self._gtagsconf if self._gtagsconf else "",
-                        self._gtagslabel, pattern_option, path_style)
+            if pattern_option is None:  # '--all' or empty means the whole project
+                cmd = 'global -P | global -L- -f {}--gtagslabel={} {}--color=never --result={}'.format(
+                            '--gtagsconf "%s" ' % self._gtagsconf if self._gtagsconf else "",
+                            self._gtagslabel, path_style, self._result_format)
+            else:
+                cmd = 'global {}--gtagslabel={} {} {}--color=never --result={}'.format(
+                            '--gtagsconf "%s" ' % self._gtagsconf if self._gtagsconf else "",
+                            self._gtagslabel, pattern_option, path_style, self._result_format)
 
             executor = AsyncExecutor()
             self._executor.append(executor)
@@ -756,6 +770,9 @@ class GtagsExplorer(Explorer):
     def getPatternRegex(self):
         return self._pattern_regex
 
+    def getResultFormat(self):
+        return self._result_format
+
 
 #*****************************************************
 # GtagsExplManager
@@ -841,6 +858,9 @@ class GtagsExplManager(Manager):
 
     def _afterEnter(self):
         super(GtagsExplManager, self)._afterEnter()
+        if self._getExplorer().getResultFormat() == "ctags":
+        elif self._getExplorer().getResultFormat() == "ctags-x":
+        elif self._getExplorer().getResultFormat() == "ctags-mod":
         id = int(lfEval('''matchadd('Lf_hl_gtagsFileName', '^.\{-}\ze\t')'''))
         self._match_ids.append(id)
         id = int(lfEval('''matchadd('Lf_hl_gtagsLineNumber', '\t\zs\d\+\ze\t')'''))

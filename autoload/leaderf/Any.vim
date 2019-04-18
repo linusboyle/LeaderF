@@ -164,7 +164,12 @@ let g:Lf_Arguments = {
             \           {"name": ["--recall"], "nargs": 0, "help": "Recall last search. If the result window is closed, reopen it."},
             \           {"name": ["--append"], "nargs": 0, "help": "Append to the previous search results."},
             \           {"name": ["--match-path"], "nargs": 0, "help": "Match the file path when fuzzy searching."},
-            \           {"name": ["--all"], "nargs": 0, "help": "search tags in all opening buffers"},
+            \           [
+            \               {"name": ["--current-buffer"], "nargs": 0, "help": "Searches in current buffer."},
+            \               {"name": ["--all-buffers"], "nargs": 0, "help": "Searches in all listed buffers."},
+            \               {"name": ["--all"], "nargs": 0, "help": "Searches in the whole project."},
+            \           ],
+            \           {"name": ["--result"], "nargs": 1, "metavar": "<FORMAT>", "help": "Show result using format, which may be one of: `ctags`(default), `ctags-x`,  `ctags-mod`."},
             \   ],
             \}
 
