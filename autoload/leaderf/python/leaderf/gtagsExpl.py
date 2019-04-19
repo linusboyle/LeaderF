@@ -34,6 +34,7 @@ class GtagsExplorer(Explorer):
         self._project_root = ""
         self._gtagslibpath = []
         self._result_format = None
+        self._last_result_format = None
         self._evalVimVar()
 
         self._task_queue = Queue.Queue()
@@ -96,6 +97,7 @@ class GtagsExplorer(Explorer):
         else:
             path_style = ""
 
+        self._last_result_format = self._result_format
         self._result_format = None
         if "-d" in kwargs.get("arguments", {}):
             pattern = kwargs.get("arguments", {})["-d"][0]
@@ -171,7 +173,7 @@ class GtagsExplorer(Explorer):
         else:
             ignorecase = ""
 
-        if "--append" not in kwargs.get("arguments", {}):
+        if "--append" not in kwargs.get("arguments", {}) or self._last_result_format is not None:
             self._pattern_regex = []
 
         # build vim regex, which is used for highlighting
@@ -476,12 +478,13 @@ class GtagsExplorer(Explorer):
         self._gtagsconf = lfEval("get(g:, 'Lf_Gtagsconf', '')")
         self._gtagslabel = lfEval("get(g:, 'Lf_Gtagslable', 'default')")
 
-        if lfEval("get(g:, 'Lf_GtagsfilesFromFileExpl', 1)") == '0':
-            self._Lf_GtagsfilesFromFileExpl = False
-            self._Lf_GtagsfilesCmd = lfEval("g:Lf_GtagsfilesCmd")
+        self._Lf_GtagsSource = int(lfEval("get(g:, 'Lf_GtagsSource', 0)"))
+        if self._Lf_GtagsSource not in [0, 1, 2]:
+            self._Lf_GtagsSource = 0
+        if self._Lf_GtagsSource != 1: # only using FileExplorer needs to evaluate the following variables
+            if self._Lf_GtagsSource == 2:
+                self._Lf_GtagsfilesCmd = lfEval("g:Lf_GtagsfilesCmd")
             return
-        else:
-            self._Lf_GtagsfilesFromFileExpl = True
 
         if lfEval("exists('g:Lf_ExternalCommand')") == '1':
             self._Lf_ExternalCommand = lfEval("g:Lf_ExternalCommand") % dir.join('""')
@@ -713,15 +716,17 @@ class GtagsExplorer(Explorer):
         return cmd
 
     def _file_list_cmd(self, root):
-        if self._Lf_GtagsfilesFromFileExpl:
+        if self._Lf_GtagsSource == 1:
             cmd = self._buildCmd(root)
-        else:
+        elif self._Lf_GtagsSource == 2:
             if os.path.exists(os.path.join(root, ".git")) and os.path.isdir(os.path.join(root, ".git")):
                 cmd = self._Lf_GtagsfilesCmd[".git"]
             elif os.path.exists(os.path.join(root, ".hg")) and os.path.isdir(os.path.join(root, ".hg")):
                 cmd = self._Lf_GtagsfilesCmd[".hg"]
             else:
                 cmd = self._Lf_GtagsfilesCmd["default"]
+        else:
+            cmd = None
 
         return cmd
 
@@ -773,6 +778,8 @@ class GtagsExplorer(Explorer):
     def getResultFormat(self):
         return self._result_format
 
+    def getLastResultFormat(self):
+        return self._last_result_format
 
 #*****************************************************
 # GtagsExplManager
@@ -948,7 +955,7 @@ class GtagsExplManager(Manager):
         lfCmd("setlocal nomodifiable")
 
     def getArguments(self):
-        if self._getExplorer().getResultFormat() is not None and \
+        if self._getExplorer().getLastResultFormat() is not None and \
                 "--append" in self._arguments:
             del self._arguments["--append"]
         return self._arguments
